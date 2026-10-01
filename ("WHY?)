@@ -1,0 +1,1597 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
+local Camera = workspace.CurrentCamera
+local UIS = UserInputService
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local destinationPart = nil
+local previewPart = nil
+local previewEnabled = false
+local lastValidPreviewPos = nil
+local tweenMode = false
+local isMinimized = false
+local speedValue = 5
+local heightValue = 0
+
+local godEnabled = false
+local antiFlingEnabled = false
+local lastSafeCFrame = nil
+local isRecovering = false
+local godRespawnConn = nil
+local HUGE = math.huge
+local ZERO_VEC = Vector3.zero
+
+local aimEnabled = false
+local aimFOV = 100
+local aimSmoothness = 0.5
+local aimPartList = {"Head", "HumanoidRootPart", "UpperTorso"}
+local aimPartIndex = 1
+local aimTeamCheck = true
+local aimWallCheck = true
+
+local espEnabled = false
+local espObjects = {}
+
+local shaderEnabled = false
+local shaderEffects = {}
+
+local fullBrightEnabled = false
+local lastFullBrightApply = 0
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 60
+FOVCircle.Radius = aimFOV
+FOVCircle.Filled = false
+FOVCircle.Color = Color3.fromRGB(140, 90, 255)
+FOVCircle.Transparency = 0.7
+FOVCircle.Visible = false
+
+previewPart = Instance.new("Part")
+previewPart.Name = "PCD3Preview"
+previewPart.Size = Vector3.new(4, 6, 4)
+previewPart.Anchored = true
+previewPart.CanCollide = false
+previewPart.CanQuery = false
+previewPart.CanTouch = false
+previewPart.Material = Enum.Material.ForceField
+previewPart.Color = Color3.fromRGB(255, 40, 40)
+previewPart.Transparency = 0.75
+previewPart.CastShadow = false
+previewPart.Parent = workspace
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PCD3Tools"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Size = UDim2.new(0, 280, 0, 360)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(22, 20, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local mainScale = Instance.new("UIScale")
+mainScale.Scale = 0.4
+mainScale.Parent = mainFrame
+TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 14)
+mainCorner.Parent = mainFrame
+
+local mainGradient = Instance.new("UIGradient")
+mainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 25, 80)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 18, 35))
+})
+mainGradient.Rotation = 90
+mainGradient.Parent = mainFrame
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(140, 90, 255)
+mainStroke.Thickness = 2
+mainStroke.Transparency = 0.2
+mainStroke.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -80, 0, 30)
+title.Position = UDim2.new(0, 14, 0, 12)
+title.BackgroundTransparency = 1
+title.Text = "PCD3 Tools"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 24
+title.TextColor3 = Color3.fromRGB(210, 180, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = mainFrame
+
+local titleStroke = Instance.new("UIStroke")
+titleStroke.Color = Color3.fromRGB(120, 70, 220)
+titleStroke.Thickness = 1
+titleStroke.Transparency = 0.4
+titleStroke.Parent = title
+
+local subtitle = Instance.new("TextLabel")
+subtitle.Size = UDim2.new(1, 0, 0, 16)
+subtitle.Position = UDim2.new(0, 14, 0, 42)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "By Pichigdasos"
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextSize = 12
+subtitle.TextColor3 = Color3.fromRGB(185, 185, 215)
+subtitle.TextTransparency = 0.5
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+subtitle.Parent = mainFrame
+
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, -30, 0, 30)
+tabBar.Position = UDim2.new(0, 15, 0, 68)
+tabBar.BackgroundColor3 = Color3.fromRGB(30, 25, 50)
+tabBar.BorderSizePixel = 0
+tabBar.Parent = mainFrame
+
+local tbCorner = Instance.new("UICorner")
+tbCorner.CornerRadius = UDim.new(0, 8)
+tbCorner.Parent = tabBar
+
+local contentArea = Instance.new("Frame")
+contentArea.Size = UDim2.new(1, -30, 0, 240)
+contentArea.Position = UDim2.new(0, 15, 0, 106)
+contentArea.BackgroundTransparency = 1
+contentArea.BorderSizePixel = 0
+contentArea.Parent = mainFrame
+
+local tabFrames = {}
+local tabButtons = {}
+
+local tabCanvasSizes = {
+    Main = 460,
+    Tools = 340,
+    Visual = 260,
+}
+
+local function makeTab(name, index)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.333, -4, 1, -6)
+    btn.Position = UDim2.new((index - 1) * 0.333, 2 + (index - 1) * 2, 0, 3)
+    btn.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    btn.Text = name
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.TextColor3 = Color3.fromRGB(220, 200, 255)
+    btn.AutoButtonColor = false
+    btn.BorderSizePixel = 0
+    btn.Parent = tabBar
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = btn
+
+    local frame = Instance.new("ScrollingFrame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.BorderSizePixel = 0
+    frame.ScrollBarThickness = 4
+    frame.ScrollBarImageColor3 = Color3.fromRGB(140, 90, 255)
+    frame.CanvasSize = UDim2.new(0, 0, 0, tabCanvasSizes[name] or 300)
+    frame.Visible = false
+    frame.Parent = contentArea
+
+    tabFrames[name] = frame
+    tabButtons[name] = btn
+
+    btn.MouseButton1Click:Connect(function()
+        for n, f in pairs(tabFrames) do
+            f.Visible = (n == name)
+        end
+        for n, b in pairs(tabButtons) do
+            if n == name then
+                TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(90, 55, 155)}):Play()
+            else
+                TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(55, 35, 95)}):Play()
+            end
+        end
+    end)
+
+    return frame
+end
+
+local mainTab = makeTab("Main", 1)
+local toolsTab = makeTab("Tools", 2)
+local visualTab = makeTab("Visual", 3)
+
+for n, b in pairs(tabButtons) do
+    if n == "Main" then
+        b.BackgroundColor3 = Color3.fromRGB(90, 55, 155)
+    end
+end
+tabFrames["Main"].Visible = true
+
+local baseColors = {}
+local originalSizes = {}
+
+local function styleButton(btn, baseColor)
+    baseColors[btn] = baseColor
+    originalSizes[btn] = btn.Size
+    btn.AutoButtonColor = false
+    btn.BorderSizePixel = 0
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 8)
+    c.Parent = btn
+
+    local s = Instance.new("UIStroke")
+    s.Color = Color3.fromRGB(140, 90, 255)
+    s.Thickness = 1
+    s.Transparency = 0.5
+    s.Parent = btn
+
+    btn.MouseEnter:Connect(function()
+        if baseColors[btn] == Color3.fromRGB(55, 35, 95) then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(90, 55, 155)}):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = baseColors[btn]}):Play()
+    end)
+    btn.MouseButton1Down:Connect(function()
+        local sz = originalSizes[btn]
+        TweenService:Create(btn, TweenInfo.new(0.08), {
+            Size = UDim2.new(sz.X.Scale, sz.X.Offset - 6, sz.Y.Scale, sz.Y.Offset - 4)
+        }):Play()
+    end)
+    btn.MouseButton1Up:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = originalSizes[btn]
+        }):Play()
+    end)
+end
+
+local function makeButton(parent, text, yPos, height, width, xPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(width or 1, 0, 0, height or 42)
+    btn.Position = UDim2.new(xPos or 0, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    btn.Text = text
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 15
+    btn.TextColor3 = Color3.fromRGB(235, 225, 255)
+    btn.Parent = parent
+    styleButton(btn, Color3.fromRGB(55, 35, 95))
+    return btn
+end
+
+local godButton = makeButton(mainTab, "GodMode: OFF", 0)
+
+local godWarning = Instance.new("TextLabel")
+godWarning.Size = UDim2.new(1, -10, 0, 14)
+godWarning.Position = UDim2.new(0, 5, 0, 44)
+godWarning.BackgroundTransparency = 1
+godWarning.Text = "Restart required for it to work"
+godWarning.Font = Enum.Font.Gotham
+godWarning.TextSize = 11
+godWarning.TextColor3 = Color3.fromRGB(255, 200, 90)
+godWarning.TextTransparency = 0.15
+godWarning.TextXAlignment = Enum.TextXAlignment.Left
+godWarning.Parent = mainTab
+
+local antiFlingButton = makeButton(mainTab, "Anti Fling: OFF", 62)
+local aimButton = makeButton(mainTab, "Aimbot: OFF", 114)
+
+local aimConfigs = {}
+
+local aimPartBtn = makeButton(mainTab, "Aim Part: Head", 166, 34)
+aimPartBtn.TextSize = 13
+aimConfigs[#aimConfigs + 1] = aimPartBtn
+
+local fovLabel = Instance.new("TextLabel")
+fovLabel.Size = UDim2.new(1, -20, 0, 18)
+fovLabel.Position = UDim2.new(0, 10, 0, 208)
+fovLabel.BackgroundTransparency = 1
+fovLabel.Text = "FOV: 100"
+fovLabel.Font = Enum.Font.GothamMedium
+fovLabel.TextSize = 13
+fovLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
+fovLabel.TextXAlignment = Enum.TextXAlignment.Left
+fovLabel.Parent = mainTab
+aimConfigs[#aimConfigs + 1] = fovLabel
+
+local fovTrack = Instance.new("Frame")
+fovTrack.Size = UDim2.new(1, -20, 0, 10)
+fovTrack.Position = UDim2.new(0, 10, 0, 234)
+fovTrack.BackgroundColor3 = Color3.fromRGB(50, 40, 75)
+fovTrack.BorderSizePixel = 0
+fovTrack.Active = true
+fovTrack.Parent = mainTab
+aimConfigs[#aimConfigs + 1] = fovTrack
+
+local ftCorner = Instance.new("UICorner")
+ftCorner.CornerRadius = UDim.new(1, 0)
+ftCorner.Parent = fovTrack
+
+local fovFill = Instance.new("Frame")
+fovFill.Size = UDim2.new((aimFOV - 30) / 270, 0, 1, 0)
+fovFill.BackgroundColor3 = Color3.fromRGB(140, 90, 255)
+fovFill.BorderSizePixel = 0
+fovFill.Parent = fovTrack
+
+local ffCorner = Instance.new("UICorner")
+ffCorner.CornerRadius = UDim.new(1, 0)
+ffCorner.Parent = fovFill
+
+local fovKnob = Instance.new("Frame")
+fovKnob.Size = UDim2.new(0, 16, 0, 16)
+fovKnob.Position = UDim2.new((aimFOV - 30) / 270, -8, 0.5, -8)
+fovKnob.BackgroundColor3 = Color3.fromRGB(210, 180, 255)
+fovKnob.BorderSizePixel = 0
+fovKnob.Parent = fovTrack
+
+local fkCorner = Instance.new("UICorner")
+fkCorner.CornerRadius = UDim.new(1, 0)
+fkCorner.Parent = fovKnob
+
+local fkStroke = Instance.new("UIStroke")
+fkStroke.Color = Color3.fromRGB(140, 90, 255)
+fkStroke.Thickness = 2
+fkStroke.Parent = fovKnob
+
+local smoothLabel = Instance.new("TextLabel")
+smoothLabel.Size = UDim2.new(1, -20, 0, 18)
+smoothLabel.Position = UDim2.new(0, 10, 0, 260)
+smoothLabel.BackgroundTransparency = 1
+smoothLabel.Text = "Smoothness: 0.50"
+smoothLabel.Font = Enum.Font.GothamMedium
+smoothLabel.TextSize = 13
+smoothLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
+smoothLabel.TextXAlignment = Enum.TextXAlignment.Left
+smoothLabel.Parent = mainTab
+aimConfigs[#aimConfigs + 1] = smoothLabel
+
+local smoothTrack = Instance.new("Frame")
+smoothTrack.Size = UDim2.new(1, -20, 0, 10)
+smoothTrack.Position = UDim2.new(0, 10, 0, 286)
+smoothTrack.BackgroundColor3 = Color3.fromRGB(50, 40, 75)
+smoothTrack.BorderSizePixel = 0
+smoothTrack.Active = true
+smoothTrack.Parent = mainTab
+aimConfigs[#aimConfigs + 1] = smoothTrack
+
+local smtCorner = Instance.new("UICorner")
+smtCorner.CornerRadius = UDim.new(1, 0)
+smtCorner.Parent = smoothTrack
+
+local smoothFill = Instance.new("Frame")
+smoothFill.Size = UDim2.new((aimSmoothness - 0.05) / 0.95, 0, 1, 0)
+smoothFill.BackgroundColor3 = Color3.fromRGB(140, 90, 255)
+smoothFill.BorderSizePixel = 0
+smoothFill.Parent = smoothTrack
+
+local smfCorner = Instance.new("UICorner")
+smfCorner.CornerRadius = UDim.new(1, 0)
+smfCorner.Parent = smoothFill
+
+local smoothKnob = Instance.new("Frame")
+smoothKnob.Size = UDim2.new(0, 16, 0, 16)
+smoothKnob.Position = UDim2.new((aimSmoothness - 0.05) / 0.95, -8, 0.5, -8)
+smoothKnob.BackgroundColor3 = Color3.fromRGB(210, 180, 255)
+smoothKnob.BorderSizePixel = 0
+smoothKnob.Parent = smoothTrack
+
+local smkCorner = Instance.new("UICorner")
+smkCorner.CornerRadius = UDim.new(1, 0)
+smkCorner.Parent = smoothKnob
+
+local smkStroke = Instance.new("UIStroke")
+smkStroke.Color = Color3.fromRGB(140, 90, 255)
+smkStroke.Thickness = 2
+smkStroke.Parent = smoothKnob
+
+local teamCheckBtn = makeButton(mainTab, "Team Check: ON", 310, 34, 0.485)
+teamCheckBtn.TextSize = 12
+aimConfigs[#aimConfigs + 1] = teamCheckBtn
+
+local wallCheckBtn = makeButton(mainTab, "Wall Check: ON", 310, 34, 0.485, 0.515)
+wallCheckBtn.TextSize = 12
+aimConfigs[#aimConfigs + 1] = wallCheckBtn
+
+local function setAimConfigsVisible(vis)
+    for _, obj in ipairs(aimConfigs) do
+        obj.Visible = vis
+    end
+end
+setAimConfigsVisible(false)
+
+local placeButton = makeButton(toolsTab, "Place Destination", 0)
+local showButton = makeButton(toolsTab, "Show Where Destination Will Be: OFF", 52, 34)
+showButton.TextSize = 12
+local tpButton = makeButton(toolsTab, "TP to Destination", 96)
+local tweenButton = makeButton(toolsTab, "Tween Mode: OFF", 148)
+
+local speedContainer = Instance.new("Frame")
+speedContainer.Size = UDim2.new(1, 0, 0, 55)
+speedContainer.Position = UDim2.new(0, 0, 0, 202)
+speedContainer.BackgroundColor3 = Color3.fromRGB(30, 25, 50)
+speedContainer.BorderSizePixel = 0
+speedContainer.Visible = false
+speedContainer.BackgroundTransparency = 1
+speedContainer.Parent = toolsTab
+
+local scCorner = Instance.new("UICorner")
+scCorner.CornerRadius = UDim.new(0, 8)
+scCorner.Parent = speedContainer
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, -20, 0, 18)
+speedLabel.Position = UDim2.new(0, 10, 0, 4)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "Speed: 5"
+speedLabel.Font = Enum.Font.GothamMedium
+speedLabel.TextSize = 13
+speedLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
+speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+speedLabel.Parent = speedContainer
+
+local speedTrack = Instance.new("Frame")
+speedTrack.Size = UDim2.new(1, -24, 0, 10)
+speedTrack.Position = UDim2.new(0, 12, 0, 32)
+speedTrack.BackgroundColor3 = Color3.fromRGB(50, 40, 75)
+speedTrack.BorderSizePixel = 0
+speedTrack.Active = true
+speedTrack.Parent = speedContainer
+
+local stCorner = Instance.new("UICorner")
+stCorner.CornerRadius = UDim.new(1, 0)
+stCorner.Parent = speedTrack
+
+local speedFill = Instance.new("Frame")
+speedFill.Size = UDim2.new(0.01, 0, 1, 0)
+speedFill.BackgroundColor3 = Color3.fromRGB(140, 90, 255)
+speedFill.BorderSizePixel = 0
+speedFill.Parent = speedTrack
+
+local sfCorner = Instance.new("UICorner")
+sfCorner.CornerRadius = UDim.new(1, 0)
+sfCorner.Parent = speedFill
+
+local speedKnob = Instance.new("Frame")
+speedKnob.Size = UDim2.new(0, 16, 0, 16)
+speedKnob.Position = UDim2.new(0.01, -8, 0.5, -8)
+speedKnob.BackgroundColor3 = Color3.fromRGB(210, 180, 255)
+speedKnob.BorderSizePixel = 0
+speedKnob.Parent = speedTrack
+
+local skCorner = Instance.new("UICorner")
+skCorner.CornerRadius = UDim.new(1, 0)
+skCorner.Parent = speedKnob
+
+local skStroke = Instance.new("UIStroke")
+skStroke.Color = Color3.fromRGB(140, 90, 255)
+skStroke.Thickness = 2
+skStroke.Parent = speedKnob
+
+local heightContainer = Instance.new("Frame")
+heightContainer.Size = UDim2.new(1, 0, 0, 55)
+heightContainer.Position = UDim2.new(0, 0, 0, 263)
+heightContainer.BackgroundColor3 = Color3.fromRGB(30, 25, 50)
+heightContainer.BorderSizePixel = 0
+heightContainer.Visible = false
+heightContainer.BackgroundTransparency = 1
+heightContainer.Parent = toolsTab
+
+local hcCorner = Instance.new("UICorner")
+hcCorner.CornerRadius = UDim.new(0, 8)
+hcCorner.Parent = heightContainer
+
+local heightLabel = Instance.new("TextLabel")
+heightLabel.Size = UDim2.new(1, -20, 0, 18)
+heightLabel.Position = UDim2.new(0, 10, 0, 4)
+heightLabel.BackgroundTransparency = 1
+heightLabel.Text = "Height: 0"
+heightLabel.Font = Enum.Font.GothamMedium
+heightLabel.TextSize = 13
+heightLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
+heightLabel.TextXAlignment = Enum.TextXAlignment.Left
+heightLabel.Parent = heightContainer
+
+local heightTrack = Instance.new("Frame")
+heightTrack.Size = UDim2.new(1, -24, 0, 10)
+heightTrack.Position = UDim2.new(0, 12, 0, 32)
+heightTrack.BackgroundColor3 = Color3.fromRGB(50, 40, 75)
+heightTrack.BorderSizePixel = 0
+heightTrack.Active = true
+heightTrack.Parent = heightContainer
+
+local htCorner = Instance.new("UICorner")
+htCorner.CornerRadius = UDim.new(1, 0)
+htCorner.Parent = heightTrack
+
+local heightFill = Instance.new("Frame")
+heightFill.Size = UDim2.new(0, 0, 1, 0)
+heightFill.BackgroundColor3 = Color3.fromRGB(80, 180, 255)
+heightFill.BorderSizePixel = 0
+heightFill.Parent = heightTrack
+
+local hfCorner = Instance.new("UICorner")
+hfCorner.CornerRadius = UDim.new(1, 0)
+hfCorner.Parent = heightFill
+
+local heightKnob = Instance.new("Frame")
+heightKnob.Size = UDim2.new(0, 16, 0, 16)
+heightKnob.Position = UDim2.new(0, -8, 0.5, -8)
+heightKnob.BackgroundColor3 = Color3.fromRGB(180, 220, 255)
+heightKnob.BorderSizePixel = 0
+heightKnob.Parent = heightTrack
+
+local hkCorner = Instance.new("UICorner")
+hkCorner.CornerRadius = UDim.new(1, 0)
+hkCorner.Parent = heightKnob
+
+local hkStroke = Instance.new("UIStroke")
+hkStroke.Color = Color3.fromRGB(80, 180, 255)
+hkStroke.Thickness = 2
+hkStroke.Parent = heightKnob
+
+local espButton = makeButton(visualTab, "ESP: OFF", 0)
+local shaderButton = makeButton(visualTab, "Shader: OFF", 52)
+local fullBrightButton = makeButton(visualTab, "Loop NoFog + FullBright: OFF", 104, 42)
+fullBrightButton.TextSize = 13
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 24, 0, 24)
+closeButton.Position = UDim2.new(1, -30, 0, 14)
+closeButton.BackgroundColor3 = Color3.fromRGB(210, 55, 65)
+closeButton.Text = "X"
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 14
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.AutoButtonColor = false
+closeButton.BorderSizePixel = 0
+closeButton.Parent = mainFrame
+
+local cc = Instance.new("UICorner")
+cc.CornerRadius = UDim.new(0, 6)
+cc.Parent = closeButton
+
+local minButton = Instance.new("TextButton")
+minButton.Size = UDim2.new(0, 24, 0, 24)
+minButton.Position = UDim2.new(1, -58, 0, 14)
+minButton.BackgroundColor3 = Color3.fromRGB(90, 70, 140)
+minButton.Text = "-"
+minButton.Font = Enum.Font.GothamBold
+minButton.TextSize = 16
+minButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minButton.AutoButtonColor = false
+minButton.BorderSizePixel = 0
+minButton.Parent = mainFrame
+
+local mc = Instance.new("UICorner")
+mc.CornerRadius = UDim.new(0, 6)
+mc.Parent = minButton
+
+local pButton = Instance.new("TextButton")
+pButton.Size = UDim2.new(0, 0, 0, 0)
+pButton.Position = UDim2.new(0, 30, 0.5, -26)
+pButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+pButton.Text = "P"
+pButton.Font = Enum.Font.GothamBold
+pButton.TextSize = 24
+pButton.TextColor3 = Color3.fromRGB(210, 180, 255)
+pButton.AutoButtonColor = false
+pButton.BorderSizePixel = 0
+pButton.Visible = false
+pButton.Active = true
+pButton.Parent = screenGui
+
+local pc = Instance.new("UICorner")
+pc.CornerRadius = UDim.new(1, 0)
+pc.Parent = pButton
+
+local ps = Instance.new("UIStroke")
+ps.Color = Color3.fromRGB(140, 90, 255)
+ps.Thickness = 2
+ps.Parent = pButton
+
+local pDragging = false
+local pMoved = false
+local pDragStart
+local pStartPos
+
+pButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        pDragging = true
+        pMoved = false
+        pDragStart = input.Position
+        pStartPos = pButton.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if pDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - pDragStart
+        if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
+            pMoved = true
+        end
+        pButton.Position = UDim2.new(
+            pStartPos.X.Scale,
+            pStartPos.X.Offset + delta.X,
+            pStartPos.Y.Scale,
+            pStartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if pDragging then
+            pDragging = false
+            if not pMoved then
+                isMinimized = false
+                mainFrame.Visible = true
+                mainScale.Scale = 0.4
+                TweenService:Create(mainScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+                TweenService:Create(pButton, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+                    Size = UDim2.new(0, 0, 0, 0),
+                    BackgroundTransparency = 1
+                }):Play()
+                task.delay(0.25, function()
+                    pButton.Visible = false
+                    pButton.BackgroundTransparency = 0
+                end)
+            end
+        end
+    end
+end)
+
+local function makeSliderDraggable(track, callback)
+    local dragging = false
+    local function update(input)
+        local trackPos = track.AbsolutePosition.X
+        local trackSize = track.AbsoluteSize.X
+        local alpha = (input.Position.X - trackPos) / trackSize
+        callback(alpha)
+    end
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            update(input)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+local function updateSpeedFromSlider(alpha)
+    alpha = math.clamp(alpha, 0, 1)
+    speedValue = math.max(1, math.floor(alpha * 500 + 0.5))
+    speedFill.Size = UDim2.new(alpha, 0, 1, 0)
+    speedKnob.Position = UDim2.new(alpha, -8, 0.5, -8)
+    speedLabel.Text = "Speed: " .. speedValue
+end
+
+local function updateHeightFromSlider(alpha)
+    alpha = math.clamp(alpha, 0, 1)
+    heightValue = math.floor(alpha * 100 + 0.5)
+    heightFill.Size = UDim2.new(alpha, 0, 1, 0)
+    heightKnob.Position = UDim2.new(alpha, -8, 0.5, -8)
+    heightLabel.Text = "Height: " .. heightValue
+end
+
+local function updateFOVFromSlider(alpha)
+    alpha = math.clamp(alpha, 0, 1)
+    aimFOV = 30 + math.floor(alpha * 270 + 0.5)
+    fovFill.Size = UDim2.new(alpha, 0, 1, 0)
+    fovKnob.Position = UDim2.new(alpha, -8, 0.5, -8)
+    fovLabel.Text = "FOV: " .. aimFOV
+    FOVCircle.Radius = aimFOV
+end
+
+local function updateSmoothFromSlider(alpha)
+    alpha = math.clamp(alpha, 0, 1)
+    aimSmoothness = 0.05 + (alpha * 0.95)
+    smoothFill.Size = UDim2.new(alpha, 0, 1, 0)
+    smoothKnob.Position = UDim2.new(alpha, -8, 0.5, -8)
+    smoothLabel.Text = "Smoothness: " .. string.format("%.2f", aimSmoothness)
+end
+
+makeSliderDraggable(speedTrack, updateSpeedFromSlider)
+makeSliderDraggable(heightTrack, updateHeightFromSlider)
+makeSliderDraggable(fovTrack, updateFOVFromSlider)
+makeSliderDraggable(smoothTrack, updateSmoothFromSlider)
+
+updateSpeedFromSlider(5 / 500)
+updateHeightFromSlider(0)
+
+local function updateDestinationColor()
+    local col = tweenMode and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(255, 40, 40)
+    if destinationPart then
+        destinationPart.Color = col
+        local light = destinationPart:FindFirstChildOfClass("PointLight")
+        if light then light.Color = col end
+        local sel = destinationPart:FindFirstChildOfClass("SelectionBox")
+        if sel then sel.Color3 = col end
+    end
+    if previewPart then
+        previewPart.Color = col
+    end
+end
+
+local function isMouseOverMenu()
+    local mouseLoc = UIS:GetMouseLocation()
+    local inset = GuiService:GetGuiInset()
+    local x = mouseLoc.X - inset.X
+    local y = mouseLoc.Y - inset.Y
+    local objects = playerGui:GetGuiObjectsAtPosition(x, y)
+    for _, obj in ipairs(objects) do
+        if obj and obj:IsDescendantOf(screenGui) then
+            return true
+        end
+    end
+    return false
+end
+
+local function getPreviewPosition()
+    local mouseLoc = UIS:GetMouseLocation()
+    local inset = GuiService:GetGuiInset()
+    local ray = Camera:ViewportPointToRay(mouseLoc.X - inset.X, mouseLoc.Y - inset.Y)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ex = {previewPart}
+    if destinationPart then table.insert(ex, destinationPart) end
+    if player.Character then table.insert(ex, player.Character) end
+    params.FilterDescendantsInstances = ex
+    local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+    if result then
+        return result.Position + Vector3.new(0, 3, 0)
+    end
+    local char = player.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            return hrp.Position + hrp.CFrame.LookVector * 8 + Vector3.new(0, 3, 0)
+        end
+    end
+    return nil
+end
+
+RunService.RenderStepped:Connect(function()
+    if previewPart and previewPart.Parent then
+        if previewEnabled then
+            if isMouseOverMenu() then
+                if lastValidPreviewPos then
+                    previewPart.Position = lastValidPreviewPos
+                end
+                previewPart.Transparency = 0.6
+            else
+                local pos = getPreviewPosition()
+                if pos then
+                    lastValidPreviewPos = pos
+                    previewPart.Position = pos
+                    previewPart.Transparency = 0.6
+                else
+                    previewPart.Transparency = 1
+                end
+            end
+        else
+            previewPart.Transparency = 1
+        end
+    end
+end)
+
+local function placeDestination()
+    if destinationPart then
+        local old = destinationPart
+        destinationPart = nil
+        TweenService:Create(old, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Transparency = 1,
+            Size = Vector3.new(0.1, 0.1, 0.1)
+        }):Play()
+        task.delay(0.3, function()
+            if old and old.Parent then old:Destroy() end
+        end)
+    end
+
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local pos
+    if previewEnabled and lastValidPreviewPos then
+        pos = lastValidPreviewPos
+    else
+        pos = hrp.Position + hrp.CFrame.LookVector * 8 + Vector3.new(0, 3, 0)
+    end
+
+    local col = tweenMode and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(255, 40, 40)
+
+    local part = Instance.new("Part")
+    part.Name = "PCD3Destination"
+    part.Size = Vector3.new(0.1, 0.1, 0.1)
+    part.Position = pos
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.Neon
+    part.Color = col
+    part.Transparency = 1
+    part.Parent = workspace
+
+    local light = Instance.new("PointLight")
+    light.Color = col
+    light.Range = 0
+    light.Brightness = 0
+    light.Parent = part
+
+    local sel = Instance.new("SelectionBox")
+    sel.Adornee = part
+    sel.Color3 = col
+    sel.LineThickness = 0.15
+    sel.Transparency = 1
+    sel.Parent = part
+
+    destinationPart = part
+
+    TweenService:Create(part, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = Vector3.new(4, 6, 4),
+        Transparency = 0.25
+    }):Play()
+    TweenService:Create(light, TweenInfo.new(0.5), {Range = 22, Brightness = 4}):Play()
+    TweenService:Create(sel, TweenInfo.new(0.5), {Transparency = 0}):Play()
+
+    task.spawn(function()
+        for i = 1, 3 do
+            if not part.Parent then return end
+            TweenService:Create(part, TweenInfo.new(0.35), {Transparency = 0.7}):Play()
+            TweenService:Create(light, TweenInfo.new(0.35), {Brightness = 8}):Play()
+            task.wait(0.35)
+            if not part.Parent then return end
+            TweenService:Create(part, TweenInfo.new(0.35), {Transparency = 0.25}):Play()
+            TweenService:Create(light, TweenInfo.new(0.35), {Brightness = 4}):Play()
+            task.wait(0.35)
+        end
+    end)
+end
+
+local function pulseButton(btn, pulseColor)
+    local original = baseColors[btn]
+    baseColors[btn] = pulseColor
+    TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = pulseColor}):Play()
+    task.delay(0.4, function()
+        baseColors[btn] = original
+        TweenService:Create(btn, TweenInfo.new(0.25), {BackgroundColor3 = original}):Play()
+    end)
+end
+
+local function teleportToDestination()
+    if not destinationPart then return end
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    pulseButton(tpButton, Color3.fromRGB(120, 200, 255))
+
+    local target = destinationPart.Position
+
+    if tweenMode then
+        local duration = math.clamp(15 / math.max(speedValue, 1), 0.15, 12)
+        local wasAnchored = hrp.Anchored
+        hrp.Anchored = true
+
+        local currentPos = hrp.Position
+
+        if heightValue > 0 then
+            local peakPos = Vector3.new(currentPos.X, currentPos.Y + heightValue, currentPos.Z)
+            local upTween = TweenService:Create(hrp, TweenInfo.new(duration * 0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                CFrame = CFrame.new(peakPos)
+            })
+            upTween:Play()
+            upTween.Completed:Wait()
+        end
+
+        local finalTween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+            CFrame = CFrame.new(target)
+        })
+        finalTween:Play()
+        finalTween.Completed:Connect(function()
+            hrp.Anchored = wasAnchored
+        end)
+    else
+        local flash = Instance.new("ColorCorrectionEffect")
+        flash.Brightness = 0.6
+        flash.Parent = game.Lighting
+        TweenService:Create(flash, TweenInfo.new(0.4), {Brightness = 0}):Play()
+        task.delay(0.5, function()
+            if flash and flash.Parent then flash:Destroy() end
+        end)
+        hrp.CFrame = CFrame.new(target)
+    end
+end
+
+local function toggleTweenMode()
+    tweenMode = not tweenMode
+    if tweenMode then
+        tpButton.Text = "Move to Destination"
+        tweenButton.Text = "Tween Mode: ON"
+        baseColors[tweenButton] = Color3.fromRGB(40, 100, 180)
+        tweenButton.BackgroundColor3 = Color3.fromRGB(40, 100, 180)
+
+        speedContainer.Visible = true
+        heightContainer.Visible = true
+        TweenService:Create(speedContainer, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+        TweenService:Create(heightContainer, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+    else
+        tpButton.Text = "TP to Destination"
+        tweenButton.Text = "Tween Mode: OFF"
+        baseColors[tweenButton] = Color3.fromRGB(55, 35, 95)
+        tweenButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+
+        TweenService:Create(speedContainer, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(heightContainer, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+        task.delay(0.2, function()
+            speedContainer.Visible = false
+            heightContainer.Visible = false
+        end)
+    end
+    updateDestinationColor()
+end
+
+local function applyGodProps(char)
+    task.spawn(function()
+        local hum = char:WaitForChild("Humanoid", 10)
+        if hum and godEnabled then
+            pcall(function()
+                hum.MaxHealth = HUGE
+                hum.Health = HUGE
+                hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+                hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+            end)
+        end
+    end)
+end
+
+local function restoreGodProps(char)
+    local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+    if hum then
+        pcall(function()
+            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+        end)
+    end
+end
+
+local function setGodmode(on)
+    godEnabled = on
+    if on then
+        if player.Character then
+            applyGodProps(player.Character)
+        end
+        if godRespawnConn then
+            pcall(function() godRespawnConn:Disconnect() end)
+        end
+        godRespawnConn = player.CharacterAdded:Connect(function(char)
+            if godEnabled then
+                applyGodProps(char)
+            end
+        end)
+    else
+        if godRespawnConn then
+            pcall(function() godRespawnConn:Disconnect() end)
+            godRespawnConn = nil
+        end
+        if player.Character then
+            restoreGodProps(player.Character)
+        end
+    end
+end
+
+local function setAntiFling(on)
+    antiFlingEnabled = on
+    if on then
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            lastSafeCFrame = char.HumanoidRootPart.CFrame
+        end
+    else
+        lastSafeCFrame = nil
+        isRecovering = false
+    end
+end
+
+local function isAlly(plr)
+    if plr == player then return true end
+    if player.Team and plr.Team then
+        return player.Team == plr.Team
+    end
+    return false
+end
+
+local function isWallBetween(targetPart)
+    if not aimWallCheck then return false end
+    local origin = Camera.CFrame.Position
+    local dir = (targetPart.Position - origin).Unit * 500
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ex = {}
+    if player.Character then table.insert(ex, player.Character) end
+    if targetPart.Parent then table.insert(ex, targetPart.Parent) end
+    params.FilterDescendantsInstances = ex
+    params.IgnoreWater = true
+    local result = workspace:Raycast(origin, dir, params)
+    if result then
+        local d1 = (result.Position - origin).Magnitude
+        local d2 = (targetPart.Position - origin).Magnitude
+        if d1 < d2 - 1 then return true end
+    end
+    return false
+end
+
+local function getClosestTarget()
+    local viewportSize = Camera.ViewportSize
+    local center = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+    local best = nil
+    local bestDist = aimFOV
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character then
+            local char = plr.Character
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local part = char:FindFirstChild(aimPartList[aimPartIndex])
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hum and part and hrp and hum.Health > 0 then
+                local valid = true
+                if aimTeamCheck and isAlly(plr) then valid = false end
+                if valid and isWallBetween(part) then valid = false end
+                if valid then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                        if dist < bestDist then
+                            bestDist = dist
+                            best = part
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+local function aimAtPart(part)
+    if not part then return end
+    local camPos = Camera.CFrame.Position
+    local targetCF = CFrame.new(camPos, part.Position)
+    Camera.CFrame = Camera.CFrame:Lerp(targetCF, aimSmoothness)
+end
+
+local function destroyESP(plr)
+    local data = espObjects[plr]
+    if not data then return end
+    if data.holder then data.holder:Destroy() end
+    if data.conn then pcall(function() data.conn:Disconnect() end) end
+    if plr.Character then
+        local h = plr.Character:FindFirstChild("PCD3ESPHighlight")
+        if h then h:Destroy() end
+    end
+    espObjects[plr] = nil
+end
+
+local function hookESP(plr, char)
+    if not espEnabled or not char then return end
+    local data = espObjects[plr]
+    if not data then return end
+
+    for _, child in ipairs(data.holder:GetChildren()) do child:Destroy() end
+    local oldHL = char:FindFirstChild("PCD3ESPHighlight")
+    if oldHL then oldHL:Destroy() end
+
+    local hrp = char:WaitForChild("HumanoidRootPart", 10)
+    if not hrp then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "Billboard"
+    billboard.Adornee = hrp
+    billboard.Size = UDim2.new(0, 130, 0, 44)
+    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = data.holder
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeTransparency = 0.4
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 14
+    nameLabel.Text = plr.DisplayName ~= "" and plr.DisplayName or plr.Name
+    nameLabel.Parent = billboard
+
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Name = "DistanceLabel"
+    distLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    distLabel.BackgroundTransparency = 1
+    distLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    distLabel.TextStrokeTransparency = 0.4
+    distLabel.Font = Enum.Font.Gotham
+    distLabel.TextSize = 12
+    distLabel.Text = "0 studs"
+    distLabel.Parent = billboard
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "PCD3ESPHighlight"
+    highlight.Adornee = char
+    highlight.FillTransparency = 0.55
+    highlight.OutlineTransparency = 0
+    if isAlly(plr) then
+        highlight.FillColor = Color3.fromRGB(0, 100, 255)
+        highlight.OutlineColor = Color3.fromRGB(0, 150, 255)
+    else
+        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 60, 60)
+    end
+    highlight.Parent = char
+end
+
+local function createESP(plr)
+    if plr == player or espObjects[plr] then return end
+    local holder = Instance.new("Folder")
+    holder.Name = "PCD3ESP_" .. plr.Name
+    holder.Parent = game.CoreGui
+
+    espObjects[plr] = {holder = holder}
+
+    if plr.Character then
+        hookESP(plr, plr.Character)
+    end
+
+    espObjects[plr].conn = plr.CharacterAdded:Connect(function(char)
+        task.wait(0.3)
+        hookESP(plr, char)
+    end)
+end
+
+local function setESP(on)
+    espEnabled = on
+    if on then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= player then
+                createESP(plr)
+            end
+        end
+    else
+        for plr, _ in pairs(espObjects) do
+            destroyESP(plr)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+    if espEnabled and plr ~= player then
+        task.wait(0.5)
+        createESP(plr)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    destroyESP(plr)
+end)
+
+local function clearShaderEffects()
+    for _, e in ipairs(shaderEffects) do
+        if e and e.Parent then e:Destroy() end
+    end
+    shaderEffects = {}
+end
+
+local function setShader(on)
+    shaderEnabled = on
+    if on then
+        Lighting.GlobalShadows = true
+        Lighting.EnvironmentDiffuseScale = 0.5
+        Lighting.EnvironmentSpecularScale = 0.95
+        Lighting.Brightness = 2.4
+        Lighting.ClockTime = 14.3
+        Lighting.GeographicLatitude = 15
+        Lighting.Ambient = Color3.fromRGB(92, 92, 105)
+        Lighting.OutdoorAmbient = Color3.fromRGB(135, 135, 150)
+        Lighting.ExposureCompensation = 0.22
+        Lighting.ShadowSoftness = 0.35
+        Lighting.FogEnd = 100000
+        Lighting.FogStart = 50000
+
+        local bloom = Instance.new("BloomEffect")
+        bloom.Intensity = 0.85
+        bloom.Size = 30
+        bloom.Threshold = 1.15
+        bloom.Parent = Lighting
+        table.insert(shaderEffects, bloom)
+
+        local atmo = Instance.new("Atmosphere")
+        atmo.Density = 0.36
+        atmo.Offset = 0.15
+        atmo.Color = Color3.fromRGB(215, 210, 220)
+        atmo.Decay = Color3.fromRGB(105, 115, 140)
+        atmo.Glare = 0.22
+        atmo.Haze = 1.6
+        atmo.Parent = Lighting
+        table.insert(shaderEffects, atmo)
+
+        local colorC = Instance.new("ColorCorrectionEffect")
+        colorC.Brightness = 0.02
+        colorC.Contrast = 0.28
+        colorC.Saturation = 0.22
+        colorC.TintColor = Color3.fromRGB(255, 248, 240)
+        colorC.Parent = Lighting
+        table.insert(shaderEffects, colorC)
+
+        local sun = Instance.new("SunRaysEffect")
+        sun.Intensity = 0.12
+        sun.Spread = 0.6
+        sun.Parent = Lighting
+        table.insert(shaderEffects, sun)
+
+        local dof = Instance.new("DepthOfFieldEffect")
+        dof.FarIntensity = 0.09
+        dof.FocusDistance = 48
+        dof.InFocusRadius = 72
+        dof.NearIntensity = 0.18
+        dof.Parent = Lighting
+        table.insert(shaderEffects, dof)
+    else
+        clearShaderEffects()
+        if not fullBrightEnabled then
+            Lighting.GlobalShadows = true
+            Lighting.EnvironmentDiffuseScale = 0
+            Lighting.EnvironmentSpecularScale = 1
+            Lighting.Brightness = 1
+            Lighting.ClockTime = 14
+            Lighting.GeographicLatitude = 0
+            Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+            Lighting.ExposureCompensation = 0
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+        end
+    end
+end
+
+local function applyFullBright()
+    Lighting.FogEnd = 100000
+    Lighting.FogStart = 100000
+    Lighting.Brightness = 3
+    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+    Lighting.ClockTime = 14
+    Lighting.GlobalShadows = false
+    Lighting.ExposureCompensation = 1
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
+    if not shaderEnabled then
+        for _, child in ipairs(Lighting:GetChildren()) do
+            if child:IsA("Atmosphere") then
+                child.Density = 0
+                child.Haze = 0
+                child.Glare = 0
+            end
+        end
+    end
+end
+
+local function setFullBright(on)
+    fullBrightEnabled = on
+    if on then
+        applyFullBright()
+    else
+        if shaderEnabled then
+            setShader(true)
+        else
+            Lighting.GlobalShadows = true
+            Lighting.EnvironmentDiffuseScale = 0
+            Lighting.EnvironmentSpecularScale = 1
+            Lighting.Brightness = 1
+            Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+            Lighting.ExposureCompensation = 0
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    local now = os.clock()
+    if fullBrightEnabled and now - lastFullBrightApply > 0.5 then
+        lastFullBrightApply = now
+        applyFullBright()
+    end
+
+    local char = player.Character
+    local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if godEnabled and hum then
+        hum.Health = HUGE
+        hum.MaxHealth = HUGE
+    end
+
+    if antiFlingEnabled and hrp and hum and hum.Health > 0 then
+        local vel = hrp.AssemblyLinearVelocity
+        local rotVel = hrp.AssemblyAngularVelocity
+        local mag = vel.Magnitude
+        local rotMag = rotVel.Magnitude
+        if not lastSafeCFrame then
+            lastSafeCFrame = hrp.CFrame
+        end
+        local isControlled = rotMag < 60
+        local curState = hum:GetState()
+        local isFalling = vel.Y < -50 and (curState == Enum.HumanoidStateType.Freefall or curState == Enum.HumanoidStateType.FallingDown)
+        local maxLin = isControlled and 1000 or 150
+        local maxUp = isControlled and 800 or 250
+        local maxDn = isControlled and (isFalling and -5000 or -800) or -350
+        local flinged = rotMag > 120 or vel.Y > maxUp or vel.Y < maxDn or mag > maxLin
+        if flinged then
+            isRecovering = true
+            hrp.AssemblyLinearVelocity = ZERO_VEC
+            hrp.AssemblyAngularVelocity = ZERO_VEC
+            if lastSafeCFrame then hrp.CFrame = lastSafeCFrame end
+            if curState == Enum.HumanoidStateType.Physics or curState == Enum.HumanoidStateType.Ragdoll or curState == Enum.HumanoidStateType.FallingDown then
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+                hum.PlatformStand = false
+            end
+        else
+            local dist = (hrp.Position - lastSafeCFrame.Position).Magnitude
+            if dist > 50 and mag < 100 and not isRecovering then
+                lastSafeCFrame = hrp.CFrame
+            end
+            if isControlled and mag < 900 then
+                lastSafeCFrame = hrp.CFrame
+                isRecovering = false
+            end
+        end
+    end
+
+    if espEnabled then
+        local myChar = player.Character
+        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if myHRP then
+            for plr, data in pairs(espObjects) do
+                local c = plr.Character
+                local hrp2 = c and c:FindFirstChild("HumanoidRootPart")
+                if hrp2 and data.holder then
+                    local bb = data.holder:FindFirstChild("Billboard")
+                    if bb then
+                        local dl = bb:FindFirstChild("DistanceLabel")
+                        if dl then
+                            dl.Text = string.format("%.0f studs", (myHRP.Position - hrp2.Position).Magnitude)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if FOVCircle then
+        local inset = GuiService:GetGuiInset()
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + inset.Y)
+        FOVCircle.Radius = aimFOV
+        FOVCircle.Visible = aimEnabled
+    end
+
+    if aimEnabled then
+        local target = getClosestTarget()
+        if target then
+            aimAtPart(target)
+        end
+    end
+end)
+
+local godState = false
+godButton.MouseButton1Click:Connect(function()
+    godState = not godState
+    if godState then
+        godButton.Text = "GodMode: ON"
+        baseColors[godButton] = Color3.fromRGB(40, 140, 60)
+        godButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        godButton.Text = "GodMode: OFF"
+        baseColors[godButton] = Color3.fromRGB(55, 35, 95)
+        godButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+    setGodmode(godState)
+    pulseButton(godButton, godState and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+local flingState = false
+antiFlingButton.MouseButton1Click:Connect(function()
+    flingState = not flingState
+    if flingState then
+        antiFlingButton.Text = "Anti Fling: ON"
+        baseColors[antiFlingButton] = Color3.fromRGB(40, 140, 60)
+        antiFlingButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        antiFlingButton.Text = "Anti Fling: OFF"
+        baseColors[antiFlingButton] = Color3.fromRGB(55, 35, 95)
+        antiFlingButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+    setAntiFling(flingState)
+    pulseButton(antiFlingButton, flingState and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+local aimState = false
+aimButton.MouseButton1Click:Connect(function()
+    aimState = not aimState
+    if aimState then
+        aimButton.Text = "Aimbot: ON"
+        baseColors[aimButton] = Color3.fromRGB(40, 140, 60)
+        aimButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        aimButton.Text = "Aimbot: OFF"
+        baseColors[aimButton] = Color3.fromRGB(55, 35, 95)
+        aimButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+    aimEnabled = aimState
+    setAimConfigsVisible(aimState)
+    pulseButton(aimButton, aimState and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+aimPartBtn.MouseButton1Click:Connect(function()
+    aimPartIndex = aimPartIndex + 1
+    if aimPartIndex > #aimPartList then
+        aimPartIndex = 1
+    end
+    aimPartBtn.Text = "Aim Part: " .. aimPartList[aimPartIndex]
+    pulseButton(aimPartBtn, Color3.fromRGB(120, 90, 200))
+end)
+
+teamCheckBtn.MouseButton1Click:Connect(function()
+    aimTeamCheck = not aimTeamCheck
+    if aimTeamCheck then
+        teamCheckBtn.Text = "Team Check: ON"
+        baseColors[teamCheckBtn] = Color3.fromRGB(40, 140, 60)
+        teamCheckBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        teamCheckBtn.Text = "Team Check: OFF"
+        baseColors[teamCheckBtn] = Color3.fromRGB(55, 35, 95)
+        teamCheckBtn.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+end)
+
+wallCheckBtn.MouseButton1Click:Connect(function()
+    aimWallCheck = not aimWallCheck
+    if aimWallCheck then
+        wallCheckBtn.Text = "Wall Check: ON"
+        baseColors[wallCheckBtn] = Color3.fromRGB(40, 140, 60)
+        wallCheckBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        wallCheckBtn.Text = "Wall Check: OFF"
+        baseColors[wallCheckBtn] = Color3.fromRGB(55, 35, 95)
+        wallCheckBtn.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+end)
+
+placeButton.MouseButton1Click:Connect(function()
+    placeDestination()
+    pulseButton(placeButton, Color3.fromRGB(255, 90, 90))
+end)
+
+showButton.MouseButton1Click:Connect(function()
+    previewEnabled = not previewEnabled
+    if previewEnabled then
+        showButton.Text = "Show Where Destination Will Be: ON"
+        baseColors[showButton] = Color3.fromRGB(40, 140, 60)
+        showButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        showButton.Text = "Show Where Destination Will Be: OFF"
+        baseColors[showButton] = Color3.fromRGB(55, 35, 95)
+        showButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+        if previewPart then previewPart.Transparency = 1 end
+    end
+    pulseButton(showButton, previewEnabled and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+tpButton.MouseButton1Click:Connect(teleportToDestination)
+
+tweenButton.MouseButton1Click:Connect(function()
+    toggleTweenMode()
+end)
+
+local espState = false
+espButton.MouseButton1Click:Connect(function()
+    espState = not espState
+    if espState then
+        espButton.Text = "ESP: ON"
+        baseColors[espButton] = Color3.fromRGB(40, 140, 60)
+        espButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        espButton.Text = "ESP: OFF"
+        baseColors[espButton] = Color3.fromRGB(55, 35, 95)
+        espButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+    setESP(espState)
+    pulseButton(espButton, espState and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+local shaderState = false
+shaderButton.MouseButton1Click:Connect(function()
+    shaderState = not shaderState
+    if shaderState then
+        shaderButton.Text = "Shader: ON"
+        baseColors[shaderButton] = Color3.fromRGB(40, 140, 60)
+        shaderButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        shaderButton.Text = "Shader: OFF"
+        baseColors[shaderButton] = Color3.fromRGB(55, 35, 95)
+        shaderButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+    setShader(shaderState)
+    pulseButton(shaderButton, shaderState and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+local fullBrightState = false
+fullBrightButton.MouseButton1Click:Connect(function()
+    fullBrightState = not fullBrightState
+    if fullBrightState then
+        fullBrightButton.Text = "Loop NoFog + FullBright: ON"
+        baseColors[fullBrightButton] = Color3.fromRGB(40, 140, 60)
+        fullBrightButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        fullBrightButton.Text = "Loop NoFog + FullBright: OFF"
+        baseColors[fullBrightButton] = Color3.fromRGB(55, 35, 95)
+        fullBrightButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+    setFullBright(fullBrightState)
+    pulseButton(fullBrightButton, fullBrightState and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    if previewPart then previewPart:Destroy() end
+    if FOVCircle then FOVCircle:Remove() end
+    TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
+    TweenService:Create(mainStroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
+    task.delay(0.3, function()
+        screenGui:Destroy()
+    end)
+end)
+
+minButton.MouseButton1Click:Connect(function()
+    isMinimized = true
+    TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
+    task.delay(0.3, function()
+        mainFrame.Visible = false
+        mainScale.Scale = 1
+        pButton.Visible = true
+        pButton.Size = UDim2.new(0, 0, 0, 0)
+        pButton.BackgroundTransparency = 1
+        TweenService:Create(pButton, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 52, 0, 52),
+            BackgroundTransparency = 0
+        }):Play()
+    end)
+end)
