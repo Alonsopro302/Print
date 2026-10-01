@@ -4,6 +4,8 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local Camera = workspace.CurrentCamera
 local UIS = UserInputService
 
@@ -43,6 +45,28 @@ local shaderEffects = {}
 
 local fullBrightEnabled = false
 local lastFullBrightApply = 0
+
+local hitboxEnabled = false
+local hitboxSize = 50
+local hitboxTransparency = 0.7
+local hitboxTeamCheck = false
+local hitboxColorIndex = 1
+local hitboxOriginals = {}
+local hitboxColors = {
+    {name = "Blue", color = Color3.fromRGB(0, 0, 255)},
+    {name = "Red", color = Color3.fromRGB(255, 0, 0)},
+    {name = "Green", color = Color3.fromRGB(0, 255, 0)},
+    {name = "Yellow", color = Color3.fromRGB(255, 255, 0)},
+    {name = "Purple", color = Color3.fromRGB(170, 0, 255)},
+    {name = "Cyan", color = Color3.fromRGB(0, 255, 255)},
+    {name = "Orange", color = Color3.fromRGB(255, 150, 0)},
+    {name = "Pink", color = Color3.fromRGB(255, 100, 200)},
+    {name = "White", color = Color3.fromRGB(255, 255, 255)},
+    {name = "Black", color = Color3.fromRGB(0, 0, 0)},
+}
+
+local respawnPoint = nil
+local respawnConn = nil
 
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 2
@@ -158,8 +182,8 @@ local tabFrames = {}
 local tabButtons = {}
 
 local tabCanvasSizes = {
-    Main = 460,
-    Tools = 340,
+    Main = 660,
+    Tools = 400,
     Visual = 260,
 }
 
@@ -414,6 +438,129 @@ local function setAimConfigsVisible(vis)
 end
 setAimConfigsVisible(false)
 
+local serverHopButton = makeButton(mainTab, "Server Hop", 354)
+
+local hitboxButton = makeButton(mainTab, "Hitbox Expander: OFF", 406)
+
+local hitboxConfigs = {}
+
+local hitboxTransLabel = Instance.new("TextLabel")
+hitboxTransLabel.Size = UDim2.new(1, -20, 0, 18)
+hitboxTransLabel.Position = UDim2.new(0, 10, 0, 458)
+hitboxTransLabel.BackgroundTransparency = 1
+hitboxTransLabel.Text = "Transparency: 0.70"
+hitboxTransLabel.Font = Enum.Font.GothamMedium
+hitboxTransLabel.TextSize = 13
+hitboxTransLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
+hitboxTransLabel.TextXAlignment = Enum.TextXAlignment.Left
+hitboxTransLabel.Parent = mainTab
+hitboxConfigs[#hitboxConfigs + 1] = hitboxTransLabel
+
+local hitboxTransTrack = Instance.new("Frame")
+hitboxTransTrack.Size = UDim2.new(1, -20, 0, 10)
+hitboxTransTrack.Position = UDim2.new(0, 10, 0, 484)
+hitboxTransTrack.BackgroundColor3 = Color3.fromRGB(50, 40, 75)
+hitboxTransTrack.BorderSizePixel = 0
+hitboxTransTrack.Active = true
+hitboxTransTrack.Parent = mainTab
+hitboxConfigs[#hitboxConfigs + 1] = hitboxTransTrack
+
+local httCorner = Instance.new("UICorner")
+httCorner.CornerRadius = UDim.new(1, 0)
+httCorner.Parent = hitboxTransTrack
+
+local hitboxTransFill = Instance.new("Frame")
+hitboxTransFill.Size = UDim2.new(0.7, 0, 1, 0)
+hitboxTransFill.BackgroundColor3 = Color3.fromRGB(140, 90, 255)
+hitboxTransFill.BorderSizePixel = 0
+hitboxTransFill.Parent = hitboxTransTrack
+
+local htfCorner = Instance.new("UICorner")
+htfCorner.CornerRadius = UDim.new(1, 0)
+htfCorner.Parent = hitboxTransFill
+
+local hitboxTransKnob = Instance.new("Frame")
+hitboxTransKnob.Size = UDim2.new(0, 16, 0, 16)
+hitboxTransKnob.Position = UDim2.new(0.7, -8, 0.5, -8)
+hitboxTransKnob.BackgroundColor3 = Color3.fromRGB(210, 180, 255)
+hitboxTransKnob.BorderSizePixel = 0
+hitboxTransKnob.Parent = hitboxTransTrack
+
+local htkCorner = Instance.new("UICorner")
+htkCorner.CornerRadius = UDim.new(1, 0)
+htkCorner.Parent = hitboxTransKnob
+
+local htkStroke = Instance.new("UIStroke")
+htkStroke.Color = Color3.fromRGB(140, 90, 255)
+htkStroke.Thickness = 2
+htkStroke.Parent = hitboxTransKnob
+
+local hitboxSizeLabel = Instance.new("TextLabel")
+hitboxSizeLabel.Size = UDim2.new(1, -20, 0, 18)
+hitboxSizeLabel.Position = UDim2.new(0, 10, 0, 510)
+hitboxSizeLabel.BackgroundTransparency = 1
+hitboxSizeLabel.Text = "Size: 50 studs"
+hitboxSizeLabel.Font = Enum.Font.GothamMedium
+hitboxSizeLabel.TextSize = 13
+hitboxSizeLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
+hitboxSizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+hitboxSizeLabel.Parent = mainTab
+hitboxConfigs[#hitboxConfigs + 1] = hitboxSizeLabel
+
+local hitboxSizeTrack = Instance.new("Frame")
+hitboxSizeTrack.Size = UDim2.new(1, -20, 0, 10)
+hitboxSizeTrack.Position = UDim2.new(0, 10, 0, 536)
+hitboxSizeTrack.BackgroundColor3 = Color3.fromRGB(50, 40, 75)
+hitboxSizeTrack.BorderSizePixel = 0
+hitboxSizeTrack.Active = true
+hitboxSizeTrack.Parent = mainTab
+hitboxConfigs[#hitboxConfigs + 1] = hitboxSizeTrack
+
+local hstCorner = Instance.new("UICorner")
+hstCorner.CornerRadius = UDim.new(1, 0)
+hstCorner.Parent = hitboxSizeTrack
+
+local hitboxSizeFill = Instance.new("Frame")
+hitboxSizeFill.Size = UDim2.new((hitboxSize - 2) / 98, 0, 1, 0)
+hitboxSizeFill.BackgroundColor3 = Color3.fromRGB(140, 90, 255)
+hitboxSizeFill.BorderSizePixel = 0
+hitboxSizeFill.Parent = hitboxSizeTrack
+
+local hsfCorner = Instance.new("UICorner")
+hsfCorner.CornerRadius = UDim.new(1, 0)
+hsfCorner.Parent = hitboxSizeFill
+
+local hitboxSizeKnob = Instance.new("Frame")
+hitboxSizeKnob.Size = UDim2.new(0, 16, 0, 16)
+hitboxSizeKnob.Position = UDim2.new((hitboxSize - 2) / 98, -8, 0.5, -8)
+hitboxSizeKnob.BackgroundColor3 = Color3.fromRGB(210, 180, 255)
+hitboxSizeKnob.BorderSizePixel = 0
+hitboxSizeKnob.Parent = hitboxSizeTrack
+
+local hskCorner = Instance.new("UICorner")
+hskCorner.CornerRadius = UDim.new(1, 0)
+hskCorner.Parent = hitboxSizeKnob
+
+local hskStroke = Instance.new("UIStroke")
+hskStroke.Color = Color3.fromRGB(140, 90, 255)
+hskStroke.Thickness = 2
+hskStroke.Parent = hitboxSizeKnob
+
+local hitboxColorBtn = makeButton(mainTab, "Hitbox Color: Blue", 562, 34)
+hitboxColorBtn.TextSize = 13
+hitboxConfigs[#hitboxConfigs + 1] = hitboxColorBtn
+
+local hitboxTeamBtn = makeButton(mainTab, "Hitbox Team Check: OFF", 604, 34)
+hitboxTeamBtn.TextSize = 13
+hitboxConfigs[#hitboxConfigs + 1] = hitboxTeamBtn
+
+local function setHitboxConfigsVisible(vis)
+    for _, obj in ipairs(hitboxConfigs) do
+        obj.Visible = vis
+    end
+end
+setHitboxConfigsVisible(false)
+
 local placeButton = makeButton(toolsTab, "Place Destination", 0)
 local showButton = makeButton(toolsTab, "Show Where Destination Will Be: OFF", 52, 34)
 showButton.TextSize = 12
@@ -543,6 +690,23 @@ local hkStroke = Instance.new("UIStroke")
 hkStroke.Color = Color3.fromRGB(80, 180, 255)
 hkStroke.Thickness = 2
 hkStroke.Parent = heightKnob
+
+local setRespawnBtn = makeButton(toolsTab, "Set Respawn Point", 324, 34, 0.72)
+setRespawnBtn.TextSize = 13
+local removeRespawnBtn = makeButton(toolsTab, "Remove", 324, 34, 0.25, 0.75)
+removeRespawnBtn.TextSize = 12
+
+local respawnStatus = Instance.new("TextLabel")
+respawnStatus.Size = UDim2.new(1, -10, 0, 14)
+respawnStatus.Position = UDim2.new(0, 5, 0, 366)
+respawnStatus.BackgroundTransparency = 1
+respawnStatus.Text = "Respawn Point: None"
+respawnStatus.Font = Enum.Font.Gotham
+respawnStatus.TextSize = 11
+respawnStatus.TextColor3 = Color3.fromRGB(180, 180, 200)
+respawnStatus.TextTransparency = 0.2
+respawnStatus.TextXAlignment = Enum.TextXAlignment.Left
+respawnStatus.Parent = toolsTab
 
 local espButton = makeButton(visualTab, "ESP: OFF", 0)
 local shaderButton = makeButton(visualTab, "Shader: OFF", 52)
@@ -714,10 +878,28 @@ local function updateSmoothFromSlider(alpha)
     smoothLabel.Text = "Smoothness: " .. string.format("%.2f", aimSmoothness)
 end
 
+local function updateHitboxTransFromSlider(alpha)
+    alpha = math.clamp(alpha, 0, 1)
+    hitboxTransparency = math.floor(alpha * 100 + 0.5) / 100
+    hitboxTransFill.Size = UDim2.new(alpha, 0, 1, 0)
+    hitboxTransKnob.Position = UDim2.new(alpha, -8, 0.5, -8)
+    hitboxTransLabel.Text = "Transparency: " .. string.format("%.2f", hitboxTransparency)
+end
+
+local function updateHitboxSizeFromSlider(alpha)
+    alpha = math.clamp(alpha, 0, 1)
+    hitboxSize = 2 + math.floor(alpha * 98 + 0.5)
+    hitboxSizeFill.Size = UDim2.new(alpha, 0, 1, 0)
+    hitboxSizeKnob.Position = UDim2.new(alpha, -8, 0.5, -8)
+    hitboxSizeLabel.Text = "Size: " .. hitboxSize .. " studs"
+end
+
 makeSliderDraggable(speedTrack, updateSpeedFromSlider)
 makeSliderDraggable(heightTrack, updateHeightFromSlider)
 makeSliderDraggable(fovTrack, updateFOVFromSlider)
 makeSliderDraggable(smoothTrack, updateSmoothFromSlider)
+makeSliderDraggable(hitboxTransTrack, updateHitboxTransFromSlider)
+makeSliderDraggable(hitboxSizeTrack, updateHitboxSizeFromSlider)
 
 updateSpeedFromSlider(5 / 500)
 updateHeightFromSlider(0)
@@ -1199,6 +1381,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(plr)
     destroyESP(plr)
+    hitboxOriginals[plr] = nil
 end)
 
 local function clearShaderEffects()
@@ -1323,6 +1506,54 @@ local function setFullBright(on)
     end
 end
 
+local function restoreHitbox(plr)
+    local orig = hitboxOriginals[plr]
+    if orig and plr.Character then
+        local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Size = orig.Size
+            hrp.Transparency = orig.Transparency
+            hrp.Color = orig.Color
+            hrp.Material = orig.Material
+            hrp.CanCollide = orig.CanCollide
+        end
+    end
+    hitboxOriginals[plr] = nil
+end
+
+local function setHitbox(on)
+    hitboxEnabled = on
+    if not on then
+        for plr, _ in pairs(hitboxOriginals) do
+            restoreHitbox(plr)
+        end
+        hitboxOriginals = {}
+    end
+end
+
+local function serverHop()
+    pulseButton(serverHopButton, Color3.fromRGB(120, 200, 255))
+    task.spawn(function()
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        end)
+        if success and result and result.data then
+            local servers = {}
+            for _, s in ipairs(result.data) do
+                if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                    table.insert(servers, s.id)
+                end
+            end
+            if #servers > 0 then
+                local chosen = servers[math.random(1, #servers)]
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, chosen, player)
+                end)
+            end
+        end
+    end)
+end
+
 RunService.Heartbeat:Connect(function()
     local now = os.clock()
     if fullBrightEnabled and now - lastFullBrightApply > 0.5 then
@@ -1371,6 +1602,37 @@ RunService.Heartbeat:Connect(function()
             if isControlled and mag < 900 then
                 lastSafeCFrame = hrp.CFrame
                 isRecovering = false
+            end
+        end
+    end
+
+    if hitboxEnabled then
+        local col = hitboxColors[hitboxColorIndex].color
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character then
+                local skip = false
+                if hitboxTeamCheck and isAlly(plr) then skip = true end
+                if not skip then
+                    local targetHrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                    if targetHrp then
+                        if not hitboxOriginals[plr] then
+                            hitboxOriginals[plr] = {
+                                Size = targetHrp.Size,
+                                Transparency = targetHrp.Transparency,
+                                Color = targetHrp.Color,
+                                Material = targetHrp.Material,
+                                CanCollide = targetHrp.CanCollide
+                            }
+                        end
+                        targetHrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                        targetHrp.Transparency = hitboxTransparency
+                        targetHrp.Color = col
+                        targetHrp.Material = Enum.Material.Neon
+                        targetHrp.CanCollide = false
+                    end
+                elseif hitboxOriginals[plr] then
+                    restoreHitbox(plr)
+                end
             end
         end
     end
@@ -1496,6 +1758,47 @@ wallCheckBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+serverHopButton.MouseButton1Click:Connect(serverHop)
+
+local hitboxState = false
+hitboxButton.MouseButton1Click:Connect(function()
+    hitboxState = not hitboxState
+    if hitboxState then
+        hitboxButton.Text = "Hitbox Expander: ON"
+        baseColors[hitboxButton] = Color3.fromRGB(40, 140, 60)
+        hitboxButton.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        hitboxButton.Text = "Hitbox Expander: OFF"
+        baseColors[hitboxButton] = Color3.fromRGB(55, 35, 95)
+        hitboxButton.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+    setHitbox(hitboxState)
+    setHitboxConfigsVisible(hitboxState)
+    pulseButton(hitboxButton, hitboxState and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(180, 60, 60))
+end)
+
+hitboxColorBtn.MouseButton1Click:Connect(function()
+    hitboxColorIndex = hitboxColorIndex + 1
+    if hitboxColorIndex > #hitboxColors then
+        hitboxColorIndex = 1
+    end
+    hitboxColorBtn.Text = "Hitbox Color: " .. hitboxColors[hitboxColorIndex].name
+    pulseButton(hitboxColorBtn, Color3.fromRGB(120, 90, 200))
+end)
+
+hitboxTeamBtn.MouseButton1Click:Connect(function()
+    hitboxTeamCheck = not hitboxTeamCheck
+    if hitboxTeamCheck then
+        hitboxTeamBtn.Text = "Hitbox Team Check: ON"
+        baseColors[hitboxTeamBtn] = Color3.fromRGB(40, 140, 60)
+        hitboxTeamBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+    else
+        hitboxTeamBtn.Text = "Hitbox Team Check: OFF"
+        baseColors[hitboxTeamBtn] = Color3.fromRGB(55, 35, 95)
+        hitboxTeamBtn.BackgroundColor3 = Color3.fromRGB(55, 35, 95)
+    end
+end)
+
 placeButton.MouseButton1Click:Connect(function()
     placeDestination()
     pulseButton(placeButton, Color3.fromRGB(255, 90, 90))
@@ -1520,6 +1823,34 @@ tpButton.MouseButton1Click:Connect(teleportToDestination)
 
 tweenButton.MouseButton1Click:Connect(function()
     toggleTweenMode()
+end)
+
+setRespawnBtn.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    respawnPoint = hrp.CFrame
+    respawnStatus.Text = "Respawn Point: Set"
+    if respawnConn then respawnConn:Disconnect() end
+    respawnConn = player.CharacterAdded:Connect(function(newChar)
+        task.wait(0.4)
+        local newHrp = newChar:WaitForChild("HumanoidRootPart", 5)
+        if newHrp and respawnPoint then
+            newHrp.CFrame = respawnPoint
+        end
+    end)
+    pulseButton(setRespawnBtn, Color3.fromRGB(80, 220, 100))
+end)
+
+removeRespawnBtn.MouseButton1Click:Connect(function()
+    respawnPoint = nil
+    respawnStatus.Text = "Respawn Point: None"
+    if respawnConn then
+        respawnConn:Disconnect()
+        respawnConn = nil
+    end
+    pulseButton(removeRespawnBtn, Color3.fromRGB(180, 60, 60))
 end)
 
 local espState = false
@@ -1573,6 +1904,9 @@ end)
 closeButton.MouseButton1Click:Connect(function()
     if previewPart then previewPart:Destroy() end
     if FOVCircle then FOVCircle:Remove() end
+    for plr, _ in pairs(hitboxOriginals) do
+        restoreHitbox(plr)
+    end
     TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
     TweenService:Create(mainStroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
     task.delay(0.3, function()
