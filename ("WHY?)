@@ -68,14 +68,17 @@ local hitboxColors = {
 local respawnPoint = nil
 local respawnConn = nil
 
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 2
-FOVCircle.NumSides = 60
-FOVCircle.Radius = aimFOV
-FOVCircle.Filled = false
-FOVCircle.Color = Color3.fromRGB(140, 90, 255)
-FOVCircle.Transparency = 0.7
-FOVCircle.Visible = false
+local FOVCircle = nil
+pcall(function()
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Thickness = 2
+    FOVCircle.NumSides = 60
+    FOVCircle.Radius = aimFOV
+    FOVCircle.Filled = false
+    FOVCircle.Color = Color3.fromRGB(140, 90, 255)
+    FOVCircle.Transparency = 0.7
+    FOVCircle.Visible = false
+end)
 
 previewPart = Instance.new("Part")
 previewPart.Name = "PCD3Preview"
@@ -867,7 +870,7 @@ local function updateFOVFromSlider(alpha)
     fovFill.Size = UDim2.new(alpha, 0, 1, 0)
     fovKnob.Position = UDim2.new(alpha, -8, 0.5, -8)
     fovLabel.Text = "FOV: " .. aimFOV
-    FOVCircle.Radius = aimFOV
+    if FOVCircle then FOVCircle.Radius = aimFOV end
 end
 
 local function updateSmoothFromSlider(alpha)
@@ -1660,8 +1663,9 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if FOVCircle then
-        local inset = GuiService:GetGuiInset()
-        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + inset.Y)
+        local ok, inset = pcall(function() return GuiService:GetGuiInset() end)
+        local insetY = ok and inset.Y or 0
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + insetY)
         FOVCircle.Radius = aimFOV
         FOVCircle.Visible = aimEnabled
     end
@@ -1903,7 +1907,7 @@ end)
 
 closeButton.MouseButton1Click:Connect(function()
     if previewPart then previewPart:Destroy() end
-    if FOVCircle then FOVCircle:Remove() end
+    if FOVCircle then pcall(function() FOVCircle:Remove() end) end
     for plr, _ in pairs(hitboxOriginals) do
         restoreHitbox(plr)
     end
