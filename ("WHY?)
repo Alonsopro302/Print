@@ -1663,9 +1663,8 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if FOVCircle then
-        local ok, inset = pcall(function() return GuiService:GetGuiInset() end)
-        local insetY = ok and inset.Y or 0
-        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + insetY)
+        local inset = GuiService:GetGuiInset()
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2 + inset.Y)
         FOVCircle.Radius = aimFOV
         FOVCircle.Visible = aimEnabled
     end
